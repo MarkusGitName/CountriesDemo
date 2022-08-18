@@ -1,0 +1,170 @@
+﻿@page "/fetchdata"
+@using Models
+@using Components
+@using Microsoft.AspNetCore.Components.Forms
+@inject HttpClient Http
+
+<PageTitle>Weather forecast</PageTitle>
+
+<h1>Weather forecast</h1>
+
+<p>This component demonstrates fetching Countries API.</p>
+
+
+
+@if (countries == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <h6>Search And display Options</h6>
+<EditForm Model="@searchObject" OnValidSubmit="@Search">
+    <h7>Search via</h7>
+    <InputSelect @bind-Value="searchObject.searcType">
+        @foreach (var type in Enum.GetValues(typeof(SearchType)))
+        {
+            <option value="@type" >@type.ToString()</option>
+        }
+    </InputSelect>
+    <h7>Show/Hide non active Data</h7>
+    <InputCheckbox @bind-Value="searchObject.showInactive" placeholder="Show In-active Data"></InputCheckbox>
+    <InputText @bind-Value="@searchObject.predicate" placeholder="predicate"/>
+        <button>Search</button>
+</EditForm>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Alpha 2</th>
+                <th>Alpha 3</th>
+                <th>Numeric</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var country in countries)
+            {
+                <tr>
+                    <td>@country.Id</td>
+                    <td>@country.Name</td>
+                    <td>@country.Alpha2</td>
+                    <td>@country.Alpha3</td>
+                    <td>@country.Numeric</td>
+                    <td>Currecies:
+                        <ul>
+                            @if(country.Currencies != null)
+                            {
+                        @foreach (Currency currency in country.Currencies)
+                        {
+                            <li>
+                                @if(searchObject.showInactive)
+                                {
+                                    @currency.Name
+                                    @if (currency.Active)
+                                    {
+                                        <a @onclick=@(()=>RemoveCurrency(currency)) href="/fetchdata"> Soft Delete Currency</a>
+                                            
+                                    }else{
+                                            
+                                        <a @onclick=@(()=>RemoveCurrency(currency)) href="/fetchdata"> Re-Activate Currency</a>
+                                    }
+                                            <a href="/AddCurrency/@currency.Id">Edit</a>
+                                }
+                                else
+                                { 
+                                    @if (currency.Active)
+                                    {
+                                        @currency.Name
+                                        <a @onclick=@(()=>RemoveCurrency(currency)) href="/fetchdata"> Soft Delete Currency</a>
+                                            
+                                    }     
+                                }
+                                    </li>
+                        }
+                            }
+                        </ul>
+                    </td>
+                    @if (country.Active)
+                    {
+                        <td><a @onclick=@(()=>RemoveCountry(country)) href="/fetchdata">Soft Delete Country</a></td>
+                    }
+                    else
+                    {
+                        <td><a @onclick=@(()=>RemoveCountry(country)) href="/fetchdata">Re-Activate Country</a></td>
+                    }
+                    <td><a href="/addcountry/@country.Id">Edit</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private Country[]? countries;
+    private SearchObject? searchObject{ get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        searchObject = new SearchObject();
+        countries = await Http.GetFromJsonAsync<Country[]>("https://localhost:7164/api/Countries");
+    }
+
+    private async Task RemoveCountry(Country country)
+    {
+        if (country.Active)
+        {
+            country.Active = false;
+        }
+        else
+        {
+            country.Active = true;
+        }        
+        await Http.PutAsJsonAsync<Country>("https://localhost:7164/api/Countries/"+country.Id,country);
+    }
+    private async Task RemoveCurrency(Currency curr)
+    {
+        if (curr.Active)
+        {
+            curr.Active = false;
+        }
+        else
+        {
+            curr.Active = true;
+        } 
+        await Http.PutAsJsonAsync<Currency>("https://localhost:7164/api/Currencies/"+curr.Id,curr);
+    }
+    public class SearchObject
+    {
+        public string predicate{ get; set; }
+        public SearchType searcType { get; set; }
+        public bool showInactive { get; set; }
+    }
+    public enum SearchType
+    {
+        All,
+        country,
+        currency
+    }
+
+    private async Task Search()
+    {
+        if(searchObject.searcType == SearchType.country)
+        {
+            countries = await Http.GetFromJsonAsync<Country[]>("https://localhost:7164/api/Countries/ByPredicate/" + searchObject.predicate);
+        }
+        else if(searchObject.searcType == SearchType.currency)
+        {
+            Currency curr = await Http.GetFromJsonAsync<Currency>("https://localhost:7164/api/Currencies/CountriesByCurrency/" + @searchObject.predicate);
+            countries = curr.Countries.ToArray();
+        }
+        else
+        {
+            countries = await Http.GetFromJsonAsync<Country[]>("https://localhost:7164/api/Countries");
+        }
+        if(!searchObject.showInactive)
+        {
+            countries = countries.Where(c => c.Active == true).ToArray();
+        }
+    }
+}

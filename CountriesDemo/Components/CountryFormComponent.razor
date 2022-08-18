@@ -1,0 +1,102 @@
+﻿@page "/AddCountry"
+@page "/AddCountry/{countryId}"
+@using Microsoft.AspNetCore.Components.Forms
+@using Models
+@inject HttpClient Http
+@if (edit)
+{
+    <h3>Edit Country</h3>
+    <button @onclick="DeleteCountry" class="btn btn-primary" style="float:right">Delete Country</button>
+}
+else
+{
+    <h3>Create Country</h3>
+}
+
+    <EditForm Model="@country" OnValidSubmit="Submit" > 
+        <InputText @bind-Value="@country.Name" placeholder="Name" class="row"/>
+        <InputText @bind-Value="@country.Alpha2" placeholder="Alpha 2" class="row"/>
+        <InputText @bind-Value="@country.Alpha3" placeholder="Alpha 3" class="row"/>
+        <InputText @bind-Value="@country.Numeric" placeholder="Numeric" class="row"/>
+        <h2>Currencies</h2>
+    @foreach (Currency currency in country.Currencies)
+    {
+        <InputText @bind-Value="@currency.Name" placeholder="Name" class="row"/>
+        <a @onclick="@(f => RemoveCurrency(currency))">Remove currency</a>
+    }
+
+    <button class="btn btn-primary" style="float:right">Submit</button>
+
+    
+    </EditForm>
+    
+<button  @onclick="AddCurrency">Add new Currency</button>
+
+<EditForm Model="@selectCurrency" OnValidSubmit="@AddExisting">
+    <InputSelect @bind-Value="selectCurrency.Id">
+        @foreach (Currency currency in Currensies)
+        {
+            <option value="@currency.Id" >@currency.Name</option>
+        }
+    </InputSelect>
+        <button>Select From Existing</button>
+</EditForm>
+@code {
+    // form models
+    [Parameter]
+    public string? countryId{ get; set; }
+    public Country? country{ get; set; }
+    public Currency selectCurrency{ get; set; }
+
+    // Currencies for selecttion
+    public Currency[] Currensies;
+
+    //edit or create
+    public bool edit = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Currensies = await Http.GetFromJsonAsync<Currency[]>("https://localhost:7164/api/Currencies/");
+        if(countryId == null)
+        {
+            country = new Country();
+            country.Currencies = new List<Currency>();
+            edit = false;
+        }
+        else
+        {
+            country = await Http.GetFromJsonAsync<Country>("https://localhost:7164/api/Countries/"+countryId);
+        }
+        selectCurrency = new Currency();
+    }
+    public async Task Submit()
+    {
+        if (edit)
+        {
+            await Http.PutAsJsonAsync<Country>("https://localhost:7164/api/Countries/"+country.Id, country);
+        }
+        else
+        {
+            await Http.PostAsJsonAsync<Country>("https://localhost:7164/api/Countries",country);
+        }
+    }
+    private void AddCurrency()
+    {
+        country.Currencies.Add(new Currency());
+    }
+    private void AddExisting()
+    {
+        selectCurrency.Name = Currensies.First(curr => curr.Id == selectCurrency.Id).Name;
+        country.Currencies.Add(selectCurrency);
+        
+        selectCurrency = new Currency();
+    }
+    private void RemoveCurrency(Currency removeCurr)
+    {
+        country.Currencies.Remove(removeCurr);
+    }
+    private async Task DeleteCountry()
+    {
+        await Http.DeleteAsync("https://localhost:7164/api/Countries/"+country.Id);
+    }
+}

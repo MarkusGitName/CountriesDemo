@@ -1,0 +1,83 @@
+﻿@page "/AddCurrency"
+@page "/AddCurrency/{currencyId}"
+@using Microsoft.AspNetCore.Components.Forms
+@using Models
+@inject HttpClient Http
+@if (edit)
+{
+    <h3>Edit Currency</h3>
+    <button @onclick="DeleteCurrency" class="btn btn-primary" style="float:right">Delete Currency</button>
+}
+else
+{
+    <h3>Create Currency</h3>
+}
+
+    <EditForm Model="@currency" OnValidSubmit="Submit" > 
+        <InputText @bind-Value="@currency.Name" placeholder="Name" class="row"/>
+
+    <button class="btn btn-primary">Submit</button>
+
+    
+    </EditForm>
+
+    
+<EditForm Model="@selectCurrency" OnValidSubmit="@SelectExisting">
+    <InputSelect @bind-Value="selectCurrency.Id">
+        @foreach (Currency currencyOption in Currensies)
+        {
+            <option value="@currencyOption.Id" >@currencyOption.Name</option>
+        }
+    </InputSelect>
+        <button>Select From Existing</button>
+</EditForm>
+    
+@code {
+    // form models
+    [Parameter]
+    public string? currencyId{ get; set; }
+    public Currency? currency{ get; set; }
+
+    // Currencies for selecttion
+    public Currency[] Currensies;
+    public Currency selectCurrency{ get; set; }
+
+    //edit or create
+    public bool edit = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        Currensies = await Http.GetFromJsonAsync<Currency[]>("https://localhost:7164/api/Currencies/");
+        if(currencyId == null)
+        {
+            currency = new Currency();
+            edit = false;
+        }
+        else
+        {
+            currency = await Http.GetFromJsonAsync<Currency>("https://localhost:7164/api/Currencies/"+currencyId);
+        }
+        selectCurrency = new Currency();
+    }
+    public async Task Submit()
+    {
+        if (edit)
+        {
+            await Http.PutAsJsonAsync<Currency>("https://localhost:7164/api/Currencies/"+currency.Id, currency);
+        }
+        else
+        {
+            await Http.PostAsJsonAsync<Currency>("https://localhost:7164/api/Currencies",currency);
+        }
+    }
+    private async Task DeleteCurrency()
+    {
+        await Http.DeleteAsync("https://localhost:7164/api/Currencies/"+currency.Id);
+    }
+    private void SelectExisting()
+    {
+        currency = Currensies.First(curr => curr.Id == selectCurrency.Id);
+        edit = true;
+    }
+}
